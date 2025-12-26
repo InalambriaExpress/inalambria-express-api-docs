@@ -1,0 +1,537 @@
+## 3) openapi.yaml (OAS 3.1.0) base con tus endpoints
+
+Copia esto como `openapi.yaml`. Incluye: server, bearerAuth, schemas básicos, respuestas, parámetros de history, y rutas para jobs.
+
+> Nota: Dejé algunos schemas “razonables” para jobs/stats porque en tu texto no venía el JSON exacto de esas respuestas. Si ya tienes la forma real, lo ajustamos a 1:1.
+
+```yaml
+openapi: 3.1.0
+info:
+  title: Inalambria Express API
+  version: 1.0.0
+  description: >
+    API for sending SMS messages and managing messaging operations.
+    Supports async and sync processing modes across all send endpoints.
+  contact:
+    name: Inalambria Express
+    url: https://inalambria.express
+servers:
+  - url: https://api.inalambria.express/v1
+    description: Production API
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    SendSameMessageRequest:
+      type: object
+      additionalProperties: false
+      required: [content, recipients]
+      properties:
+        content:
+          type: string
+          minLength: 1
+          description: The SMS message text to send to all recipients.
+          examples:
+            - "Hello! 👋 Your order #12345 has been confirmed ✅. Thank you for your purchase!"
+        recipients:
+          type: array
+          minItems: 1
+          items:
+            type: string
+          description: Array of phone numbers in E.164 format.
+          examples:
+            - ["+5730XXXXXXXX", "+5730YYYYYYYY"]
+        async:
+          type: boolean
+          description: >
+            Enable async processing. When true (default), returns immediately with a job ID.
+            When false, waits for completion (sync mode).
+          default: true
+        scheduledAt:
+          type: string
+          format: date-time
+          description: Schedule the message for future delivery (ISO 8601 format).
+          examples:
+            - "2025-12-11T18:00:00"
+
+    SendBatchRequest:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          description: Array of message items, each with its own content and recipients.
+          items:
+            type: object
+            additionalProperties: false
+            required: [content, recipients]
+            properties:
+              content:
+                type: string
+                minLength: 1
+              recipients:
+                type: array
+                minItems: 1
+                items:
+                  type: string
+        async:
+          type: boolean
+          default: true
+        scheduledAt:
+          type: string
+          format: date-time
+
+    SendTemplateRequest:
+      type: object
+      additionalProperties: false
+      required: [pattern, recipients]
+      properties:
+        pattern:
+          type: string
+          minLength: 1
+          description: Template with variables in {{variable}} format.
+          examples:
+            - "Hello {{name}}! 👋 Your verification code is: {{code}} 🔐"
+        recipients:
+          type: array
+          minItems: 1
+          description: Array of recipients, each with phone number and variables.
+          items:
+            type: object
+            additionalProperties: false
+            required: [phone, variables]
+            properties:
+              phone:
+                type: string
+                description: Phone number in E.164 format.
+                examples: ["+5730XXXXXXXX"]
+              variables:
+                type: object
+                additionalProperties:
+                  type: string
+                description: Key-value map for template variables.
+                examples:
+                  - { name: "Juan", code: "1234" }
+        async:
+          type: boolean
+          default: true
+        scheduledAt:
+          type: string
+          format: date-time
+
+    ConsumptionResponse:
+      type: object
+      additionalProperties: true
+      required: [consumptionId, ok, credits, messages]
+      properties:
+        consumptionId:
+          type: string
+          description: Consumption identifier (UUID).
+          examples: ["123e4567-e89b-12d3-a456-426614174000"]
+        ok:
+          type: boolean
+          examples: [true]
+        credits:
+          type: integer
+          examples: [1]
+        messages:
+          type: integer
+          examples: [1]
+
+    AsyncAcceptedResponse:
+      type: object
+      additionalProperties: true
+      required: [jobId, ok]
+      properties:
+        ok:
+          type: boolean
+          examples: [true]
+        jobId:
+          type: string
+          description: Async job identifier.
+          examples: ["job_123e4567e89b12d3"]
+
+    ErrorResponse:
+      type: object
+      additionalProperties: true
+      required: [ok, error]
+      properties:
+        ok:
+          type: boolean
+          examples: [false]
+        error:
+          type: string
+          examples: ["Invalid input data"]
+
+    HistoryResponse:
+      type: object
+      additionalProperties: false
+      required: [consumptions, total]
+      properties:
+        consumptions:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+            required: [id, credits, nMessages, sampleMessage, createdAt, isSent, type]
+            properties:
+              id:
+                type: string
+              credits:
+                type: integer
+              nMessages:
+                type: integer
+              sampleMessage:
+                type: string
+              createdAt:
+                type: string
+              isSent:
+                type: boolean
+              type:
+                type: string
+                description: IMMEDIATE or SCHEDULED (example naming).
+              scheduledAt:
+                type: string
+        total:
+          type: integer
+
+    BalanceResponse:
+      type: object
+      additionalProperties: false
+      required: [balance, currency, monetaryBalance, estimatedMessages, budget]
+      properties:
+        balance:
+          type: integer
+        currency:
+          type: string
+        monetaryBalance:
+          type: integer
+        estimatedMessages:
+          type: integer
+        budget:
+          type: object
+          additionalProperties: false
+          required: [daily, weekly, monthly, total]
+          properties:
+            daily:
+              $ref: "#/components/schemas/BudgetWindow"
+            weekly:
+              $ref: "#/components/schemas/BudgetWindow"
+            monthly:
+              $ref: "#/components/schemas/BudgetWindow"
+            total:
+              $ref: "#/components/schemas/BudgetWindow"
+
+    BudgetWindow:
+      type: object
+      additionalProperties: false
+      required: [limit, usage]
+      properties:
+        limit:
+          type: integer
+        usage:
+          type: integer
+
+    JobStatusResponse:
+      type: object
+      additionalProperties: true
+      required: [ok, jobId, status]
+      properties:
+        ok:
+          type: boolean
+        jobId:
+          type: string
+        status:
+          type: string
+          description: e.g., PENDING, RUNNING, COMPLETED, FAILED
+        result:
+          type: object
+          additionalProperties: true
+
+    PendingJobsResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, jobs]
+      properties:
+        ok:
+          type: boolean
+        jobs:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+
+    StatsResponse:
+      type: object
+      additionalProperties: true
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+
+security:
+  - bearerAuth: []
+
+paths:
+  /messages/send:
+    post:
+      operationId: sendSmsToMultipleRecipients
+      summary: Send SMS to multiple recipients
+      description: >
+        Send the same SMS message to multiple phone numbers in a single request.
+        Supports immediate delivery or scheduled sending via scheduledAt.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendSameMessageRequest"
+      responses:
+        "200":
+          description: OK - Message sent successfully (sync mode). Returns consumption details.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsumptionResponse"
+        "202":
+          description: Accepted - Message queued for async processing. Use GET /messages/job/{jobId} to check status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AsyncAcceptedResponse"
+        "400":
+          description: Invalid input data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authorization not provided
+        "403":
+          description: Insufficient access
+        "500":
+          description: Internal server error
+
+  /messages/send/batch:
+    post:
+      operationId: sendBatchMessages
+      summary: Send batch of different SMS messages
+      description: >
+        Send multiple different SMS messages to different recipient groups in a single API call.
+        Each item can have its own content and recipients.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendBatchRequest"
+      responses:
+        "200":
+          description: OK - Message sent successfully (sync mode). Returns consumption details.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsumptionResponse"
+        "202":
+          description: Accepted - Message queued for async processing. Use GET /messages/job/{jobId} to check status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AsyncAcceptedResponse"
+        "400":
+          description: Invalid input data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authorization not provided
+        "403":
+          description: Insufficient access
+        "500":
+          description: Internal server error
+
+  /messages/send/template:
+    post:
+      operationId: sendTemplateMessages
+      summary: Send personalized SMS with templates
+      description: >
+        Send personalized SMS using {{variable}} template syntax.
+        Each recipient receives their own variable values.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendTemplateRequest"
+      responses:
+        "200":
+          description: OK - Message sent successfully (sync mode). Returns consumption details.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsumptionResponse"
+        "202":
+          description: Accepted - Message queued for async processing. Use GET /messages/job/{jobId} to check status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AsyncAcceptedResponse"
+        "400":
+          description: Invalid input data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authorization not provided
+        "403":
+          description: Insufficient access
+        "500":
+          description: Internal server error
+
+  /messages/history:
+    get:
+      operationId: getMessageHistory
+      summary: Get message history
+      description: Retrieve message sending history for the organization.
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Maximum number of records to return (1-100, default 20).
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: Number of records to skip for pagination (default 0).
+        - name: dateFrom
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: RFC 3339 date-time start filter.
+        - name: dateTo
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: RFC 3339 date-time end filter.
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HistoryResponse"
+        "400":
+          description: Invalid input data
+        "401":
+          description: Authorization not provided
+        "403":
+          description: Insufficient access
+        "404":
+          description: Not found
+        "500":
+          description: Internal server error
+
+  /messages/balance:
+    get:
+      operationId: getCreditBalance
+      summary: Get credit balance
+      description: Get the current credit balance for the organization.
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BalanceResponse"
+        "401":
+          description: Authorization not provided
+        "403":
+          description: Insufficient access
+        "500":
+          description: Internal server error
+
+  /messages/job/{jobId}:
+    get:
+      operationId: getJobStatus
+      summary: Get async job status
+      description: Track async job status and results.
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobStatusResponse"
+        "401":
+          description: Authorization not provided
+        "403":
+          description: Insufficient access
+        "404":
+          description: Not found
+        "500":
+          description: Internal server error
+
+  /messages/jobs/pending:
+    get:
+      operationId: getPendingJobs
+      summary: List pending jobs
+      description: List pending async jobs in queue.
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PendingJobsResponse"
+        "401":
+          description: Authorization not provided
+        "403":
+          description: Insufficient access
+        "500":
+          description: Internal server error
+
+  /messages/stats:
+    get:
+      operationId: getMessagingStats
+      summary: Get messaging stats
+      description: Retrieve messaging stats (usage/metrics).
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatsResponse"
+        "401":
+          description: Authorization not provided
+        "403":
+          description: Insufficient access
+        "500":
+          description: Internal server error
