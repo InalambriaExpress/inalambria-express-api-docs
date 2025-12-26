@@ -3,7 +3,7 @@
 Official API documentation for **Inalambria Express** — send SMS messages, run campaigns, check credit balance, and track async jobs. 
 
 - Website: https://inalambria.express
-- API Base URL: https://api.inalambria.express/v1
+- API Base URL: https://api.inalambria.express/docs/
 - OpenAPI (OAS 3.1.0): [`openapi.yaml`](./openapi.yaml)
 
 ## Overview
