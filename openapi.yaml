@@ -2,7 +2,7 @@
 
 server, bearerAuth, schemas básicos, respuestas, parámetros de history, y rutas para jobs.
 
-```yaml
+```yaml 
 openapi: 3.1.0
 info:
   title: Inalambria Express API
