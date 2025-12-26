@@ -16,8 +16,8 @@ info:
 servers:
   - url: https://api.inalambria.express/v1
     description: Production API
- Docs: https://api.inalambria.express/docs/
-    description: Documentation API
+  - url: https://api.inalambria.express/docs/
+    description: API Documentation
 
 components:
   securitySchemes:
