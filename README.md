@@ -1,6 +1,6 @@
 # Inalambria Express API (v1.0.0)
 
-Official API documentation for **Inalambria Express** — send SMS messages, run campaigns, check credit balance, and track async jobs.
+Official API documentation for **Inalambria Express** — send SMS messages, run campaigns, check credit balance, and track async jobs. 
 
 - Website: https://inalambria.express
 - API Base URL: https://api.inalambria.express/v1
